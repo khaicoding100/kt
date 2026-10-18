@@ -6830,7 +6830,7 @@ body.tiny-finale-active #khung-mat,body.tiny-finale-active #tiny-sky{opacity:0!i
 #tf-gate small{color:#c9a6c4;font-weight:500}
 </style>
 <script id="tf-gate-js">
-(function(){
+    (function(){
   // ĐỔI GIỜ MỞ Ở ĐÂY: năm-tháng-ngàyTgiờ:phút:giây+múi giờ (+07:00 là giờ Việt Nam)
   var TF_OPEN_AT='2026-10-20T06:15:00+07:00';
   var openAt=Date.parse(TF_OPEN_AT);
@@ -6843,6 +6843,16 @@ body.tiny-finale-active #khung-mat,body.tiny-finale-active #tiny-sky{opacity:0!i
   function block(e){ e.stopImmediatePropagation(); e.preventDefault(); }
   evs.forEach(function(ev){ window.addEventListener(ev,block,{capture:true,passive:false}); });
   document.documentElement.style.overflow='hidden';
+  var done=false;
+  var origPlay=HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play=function(){
+    if(!done){ try{this.pause();}catch(_){} return Promise.resolve(); }
+    return origPlay.apply(this,arguments);
+  };
+  function onPlay(e){ if(!done){ try{e.target.pause();}catch(_){} } }
+  document.addEventListener('play',onPlay,true);
+  function pauseAll(){ var l=document.querySelectorAll('audio,video'); for(var i=0;i<l.length;i++){ try{l[i].pause();}catch(_){} } }
+  pauseAll();
 
   var box=null, cd=null, sm=null;
   function show(){
@@ -6855,8 +6865,7 @@ body.tiny-finale-active #khung-mat,body.tiny-finale-active #tiny-sky{opacity:0!i
   }
 
   // Giờ máy chủ = mốc giờ lấy được + thời gian trôi theo performance.now() (đổi đồng hồ máy cũng không ảnh hưởng)
-  var base=null, ref=0, done=false;
-  function nowMs(){ return base===null?null:base+(performance.now()-ref); }
+ function nowMs(){ return base===null?null:base+(performance.now()-ref); }
   function sync(serverMs,t0,t1){ base=serverMs; ref=(t0+t1)/2; }
   function ft(url,opt){            // fetch có giới hạn 4 giây để không chờ quá lâu
     if('AbortController' in window){ var c=new AbortController(); opt.signal=c.signal; setTimeout(function(){ c.abort(); },4000); }
@@ -6884,9 +6893,13 @@ body.tiny-finale-active #khung-mat,body.tiny-finale-active #tiny-sky{opacity:0!i
   }
   function pad(n){ return (n<10?'0':'')+n; }
   function unlock(){
-    done=true; clearInterval(timer); clearInterval(resync); if(box) box.remove();
+    done=true; clearInterval(timer); clearInterval(resync);
+        HTMLMediaElement.prototype.play=origPlay;
+    document.removeEventListener('play',onPlay,true); 
+    if(box) box.remove();
     evs.forEach(function(ev){ window.removeEventListener(ev,block,{capture:true}); });
     document.documentElement.style.overflow='';
+        setTimeout(function(){ document.dispatchEvent(new Event('visibilitychange')); },0);
   }
   function tick(){
     var n=nowMs(); if(n===null||done) return;
